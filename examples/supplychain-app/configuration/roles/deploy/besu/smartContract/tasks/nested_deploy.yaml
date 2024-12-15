@@ -1,0 +1,122 @@
+##############################################################################################
+#  Copyright Accenture. All Rights Reserved.
+#
+#  SPDX-License-Identifier: Apache-2.0
+##############################################################################################
+
+# Check if the peer is up
+- name: "Waiting for peer pod {{ peer.name }} in {{ component_ns }}"
+  include_role:
+    name: "../../../platforms/shared/configuration/roles/check/helm_component"
+  vars:
+    component_type: "Pod"
+    namespace: "{{ component_ns }}"
+    component_name: "{{ peer.name }}"
+    kubernetes: "{{ organization_data.k8s }}"
+    label_selectors:
+      - app = {{ component_name }}
+
+# install the required packages listed in package.json
+- name: Installing the required packages listed in package.json
+  npm:
+    path: "{{ playbook_dir }}/../../../{{ smart_contract.deployjs_path }}"
+
+# delete build directory directory
+- name: delete build directory 
+  file:
+    path: "{{ playbook_dir }}/../../../{{ smart_contract.deployjs_path }}/build"
+    state: absent
+
+# create build directory directory
+- name: create build directory 
+  file:
+    path: "{{ playbook_dir }}/../../../{{ smart_contract.deployjs_path }}/build"
+    state: directory
+
+# This task gets the node private key from the vault
+- name: get nodekey from vault
+  shell: |
+    vault kv get -field=accountPrivateKey {{ component_vault.secret_path | default('secretsv2') }}/{{ network.env.type }}{{ organization_data.name }}/besu-node-{{ peer.name }}-keys
+  environment:
+    VAULT_ADDR: "{{ component_vault.url }}"
+    VAULT_TOKEN: "{{ component_vault.root_token }}"
+  register: nodekey
+
+# This task gets the node address from the vault
+- name: get nodeAddress from vault
+  shell: |
+    vault kv get -field=accountAddress {{ component_vault.secret_path | default('secretsv2') }}/{{ network.env.type }}{{ organization_data.name }}/besu-node-{{ peer.name }}-keys
+  environment:
+    VAULT_ADDR: "{{ component_vault.url }}"
+    VAULT_TOKEN: "{{ component_vault.root_token }}"
+  register: node_address
+
+# This task gets the transaction manager public key from the vault
+- name: get tm_key from vault
+  shell: |
+    vault kv get -field=publicKey {{ component_vault.secret_path | default('secretsv2') }}/{{ network.env.type }}{{ organization_data.name }}/tessera-{{ peer.name }}-keys
+  environment:
+    VAULT_ADDR: "{{ component_vault.url }}"
+    VAULT_TOKEN: "{{ component_vault.root_token }}"
+  register: tm_key
+  when:
+  - smart_contract.public_tx is not defined or smart_contract.public_tx == false
+
+- name: Get partyinfo from tessera url
+  uri:
+    url: "https://{{ peer.name }}.{{ organization_data.external_url_suffix }}/partyinfo"
+    method: GET
+    validate_certs: no
+    status_code: 200
+  register: response
+  when:
+  - smart_contract.public_tx is not defined or smart_contract.public_tx == false
+  - smart_contract.private_for | length > 0
+
+- name: Set local_private_for to empty
+  set_fact:
+    local_private_for: ''
+
+- name: Extract tm_key based on filter
+  set_fact:
+    local_private_for: |-
+      {% for i in smart_contract.private_for %}
+      {{ response.json | json_query('keys[?contains(url, `' + i + '`)].key') | first }}{%if not loop.last %},{% endif %}
+      {% endfor %}
+  when:
+  - smart_contract.public_tx is not defined or smart_contract.public_tx == false
+  - smart_contract.private_for | length > 0
+
+# Looping on the peers and finding out the peer with a chaincode section
+- name: "Deploying contract"
+  include_tasks: deploy_contract.yaml
+  vars:
+    js_file: "deploy.js"
+    address_line: 14
+  when: smart_contract.public_tx is not defined or smart_contract.public_tx == false
+
+# Looping on the peers and finding out the peer with a chaincode section
+- name: "Deploying contract"
+  include_tasks: deploy_contract.yaml
+  vars:
+    js_file: "public_tx.js"
+    address_line: 8
+  when: smart_contract.public_tx is defined and smart_contract.public_tx == true
+
+- name:  Checking contract_address
+  debug: 
+    msg: "{{contract_address}}"
+
+############################################################################################
+# Fail the playbook if check is not defined
+- fail:
+    msg: Supplychain smartcontract is not deployed, make sure the account is unlocked and network is up.
+  when: check is not defined
+
+# ############################################################################################
+
+# delete node_module directory
+- name: Remove node_module directory 
+  file:
+    path: "{{ playbook_dir }}/../../../{{ smart_contract.deployjs_path }}/node_modules"
+    state: absent

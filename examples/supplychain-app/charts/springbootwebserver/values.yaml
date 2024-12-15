@@ -1,0 +1,90 @@
+##############################################################################################
+#  Copyright Accenture. All Rights Reserved.
+#
+#  SPDX-License-Identifier: Apache-2.0
+##############################################################################################
+metadata:
+  deployment:
+    #   annotations:
+    #     key: "value"
+    annotations: {}
+
+image:
+  #Provide the webserver of image for main container
+  #Eg. webserver: ghcr.io/bevel-supplychain-corda:springboot-latest
+  webserver: ghcr.io/hyperledger/bevel-supplychain-corda:springboot-latest
+  #Provide the name of image for init container
+  #Eg. name: adopfrablockchain.azurecr.io/alpine-utils:1.0
+  initContainer: ghcr.io/hyperledger/bevel-alpine:latest
+  #Provide the image pull secret of image
+  #Eg. pullSecret: regcred
+  imagePullSecret: 
+
+smartContract:
+  #Provide the smart contract name you need to execute
+  #Eg. name: corda-ibt-webserver-1.1.0.jar
+  name: 
+  #Provide relative smart contract path from mouth path 
+  #Eg. path: cordapps
+  path: 
+  #Provide java option
+  #Eg. JAVA_OPTIONS : -Xmx512m  
+  JAVA_OPTIONS : -Xmx512m
+  
+nodeConf:
+  #Provide the Name of the corda node for node.conf
+  #Eg. node: bank1
+  node: 
+  #Provide the node Rpc Port for node
+  #Eg. nodeRpcPort: 10008
+  nodeRpcPort: 
+  #Provide the legalName for node
+  #Eg. legalName: "O=Bank1,L=London,C=GB,CN=Bank1"
+  legalName: 
+  #Provide the devMode for corda node
+  #Eg. devMode: true
+  devMode: false
+  useSSL: false
+  #Provide the interval in seconds you want to iterate till node to be ready
+  #Eg. readinessCheckInterval: 5
+  readinessCheckInterval: 10
+  #Provide the threshold till you want to check if specified node up and running
+  #Eg. readinessThreshold: 2
+  readinessThreshold: 15
+
+credentials:
+  #Provide the rpcUser for corda node
+  #Eg. rpcUser: bank1operations
+  rpcUser: 
+  # Provide the password for the RPC User
+  rpcUserPassword: 
+  keystorePassword: 
+  truststorePassword: 
+
+resources:
+  #Provide the limit memory for node
+  #Eg. limits: "1Gi"
+  limits: "512Mi"
+  #Provide the requests memory for node
+  #Eg. requests: "2Gi"
+  requests: "512Mi"
+
+storage:
+  #Provide the memory for node
+  #Eg. memory: 4Gi
+  memory: 
+  #Provide the name for node
+  #Eg. name: bank1webnodesc
+  name: 
+
+web:
+# Note: Target ports are dependent on image being used. Please change them accordingly 
+  #Provide the web port for node
+  #Eg. port: 10009
+  port: 
+  #Provide the web node port for node 
+  #Eg. port: 30009
+  nodePort:  
+  #Provide the web targetPort for node 
+  #Eg. targetPort: 10004
+  targetPort: 20001

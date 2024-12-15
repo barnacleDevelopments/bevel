@@ -1,0 +1,57 @@
+##############################################################################################
+#  Copyright Accenture. All Rights Reserved.
+#
+#  SPDX-License-Identifier: Apache-2.0
+##############################################################################################
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ .Release.Name  }}
+{{- if .Values.deployment.annotations }}
+  annotations:
+{{ toYaml .Values.deployment.annotations | indent 8 }}
+{{- end }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ .Release.Name }}
+      app.kubernetes.io/managed-by: {{ .Release.Service }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      hostname: {{ .Release.Name }}
+      imagePullSecrets:
+        - name: {{ .Values.frontend.pullSecrets | default "regcred" }}
+      containers:
+      - name: frontend
+        image: {{  .Values.frontend.image  }}
+        imagePullPolicy: {{ .Values.frontend.pullPolicy }}
+        env:
+        - name: REACT_APP_API_ENDPOINT
+          value: "{{ .Values.frontend.apiURL  }}"
+        - name: REACT_APP_GMAPS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: gmaps-key
+              key: gmapskeyvalue
+        ports:
+        - containerPort: {{ .Values.frontend.nodePorts.targetPort }}
+          name: tcp

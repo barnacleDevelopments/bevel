@@ -1,0 +1,80 @@
+##############################################################################################
+#  Copyright Accenture. All Rights Reserved.
+#
+#  SPDX-License-Identifier: Apache-2.0
+##############################################################################################
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Values.nodeName }}
+  namespace: {{ .Values.metadata.namespace }}
+  labels:
+    run: {{ .Values.nodeName }}
+    app.kubernetes.io/name: {{ .Values.nodeName }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }} 
+spec:
+  type: {{ .Values.expressapp.serviceType }}
+  selector:
+    app: {{ .Values.nodeName }}
+  ports:
+  - port: {{ .Values.expressapp.nodePorts.port }}
+    targetPort: {{ .Values.expressapp.nodePorts.targetPort }}
+    protocol: TCP
+    name: {{ .Values.expressapp.nodePorts.name }}
+{{- if eq $.Values.proxy.provider "ambassador" }}
+---
+apiVersion: getambassador.io/v3alpha1
+kind: TLSContext
+metadata:
+  name: {{ .Values.proxy.name }}api-tlscontext
+  namespace: {{ .Values.metadata.namespace }}
+spec:
+  hosts:
+  - {{ .Values.proxy.name }}api.{{ .Values.proxy.external_url_suffix }}
+  secret: {{ .Values.proxy.peer_name }}-ambassador-certs.{{ .Values.metadata.namespace }}
+  secret_namespacing: true
+  min_tls_version: v1.2
+---
+apiVersion: getambassador.io/v3alpha1
+kind: Mapping
+metadata:
+  name: {{ .Values.proxy.name }}api-mapping
+  namespace: {{ .Values.metadata.namespace }}
+spec:
+  prefix: /
+  host: {{ .Values.proxy.name }}api.{{ .Values.proxy.external_url_suffix }}
+  service: {{ .Values.proxy.name }}-expressapi.{{ .Values.metadata.namespace }}:{{ .Values.expressapp.nodePorts.port }}
+  timeout_ms: 20000
+{{ end }}
+{{- if eq $.Values.proxy.provider "haproxy" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.nodeName }}
+  namespace:  {{ $.Values.metadata.namespace }}
+  annotations:
+    kubernetes.io/ingress.class: "haproxy"
+spec:
+  tls:
+  - hosts:
+    - {{ .Values.proxy.name }}api.{{ .Values.proxy.external_url_suffix }}
+    {{- if eq .Values.proxy.type "fabric" }}
+    secretName: {{ .Values.proxy.peer_name }}-{{ .Values.metadata.namespace }}-ambassador-certs
+    {{- else }}
+    secretName: {{ .Values.proxy.peer_name }}-ambassador-certs
+    {{- end }}
+  rules:
+  - host: {{ .Values.proxy.name }}api.{{ .Values.proxy.external_url_suffix }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.proxy.name }}-expressapi
+            port:
+              number: {{ .Values.expressapp.nodePorts.port }}
+{{- end }}

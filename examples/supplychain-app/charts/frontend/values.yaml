@@ -1,0 +1,36 @@
+##############################################################################################
+#  Copyright Accenture. All Rights Reserved.
+#
+#  SPDX-License-Identifier: Apache-2.0
+##############################################################################################
+
+# Default values for nodechart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# App parameters
+frontend:
+  nodePorts:
+    port:
+    targetPort:
+  # docker image link for the frontend app
+  #Eg. image: docker.io/frontend:latest
+  image:
+  #pullpolicy of the image
+  pullPolicy:
+  #docker secret to be used for pulling image
+  pullSecrets:
+  # URL of the express API server
+  apiURL:
+deployment:
+  annotations: {}
+proxy:
+  #This will be the proxy/ingress provider. Can have values "ambassador" or "haproxy"
+  #Eg. provider: "haproxy"
+  provider: 
+  #Name of the peer
+  #Eg. peer_name: peer0
+  peer_name: 
+  #External URL of the organization
+  #Eg. external_url_suffix: org1.blockchaincloudpoc.com
+  external_url_suffix: 

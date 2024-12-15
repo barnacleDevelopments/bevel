@@ -1,0 +1,73 @@
+##############################################################################################
+#  Copyright Accenture. All Rights Reserved.
+#
+#  SPDX-License-Identifier: Apache-2.0
+##############################################################################################
+
+# This playbook deploys the identity app to an existing DLT network
+# The DLT network should already be created using the same configuration file as that
+# used for running this playbook.
+---
+# This will apply to ansible_provisioners. /etc/ansible/hosts should be configured with this group
+- hosts: ansible_provisioners
+  gather_facts: no
+  no_log: "{{ no_ansible_log | default(false) }}"
+  tasks:
+    # delete build directory
+    - name: Remove build directory
+      file:
+        path: "./build"
+        state: absent
+
+    - include_role:
+        name:  "{{ playbook_dir }}/../../../platforms/shared/configuration/roles/setup/flux"
+      vars:
+        kubeconfig_path: "{{ item.k8s.config_file }}"
+        kubecontext: "{{ item.k8s.context }}"
+        git_username: "{{ item.gitops.username }}"
+        git_repo: "{{ item.gitops.git_repo }}"
+        git_password: "{{ item.gitops.password }}"
+        git_branch: "{{ item.gitops.branch }}"
+        git_path: "{{ item.gitops.release_dir }}"
+        git_host: "{{ item.gitops.git_repo.split('/')[0] | lower }}" # extract the hostname from the git_repo
+        git_protocol: "{{ item.gitops.git_protocol | default('https') }}"
+        git_url: "{{ item.gitops.git_url }}"
+        git_key: "{{ item.gitops.private_key | default() }}"
+        flux_version: "0.41.2"
+      with_items: "{{ network.organizations }}"  
+
+    # Deploy the Indy Webserver for trustee orgs
+    - name: "Create a value file to deploy Indy WebServer"
+      include_role:
+        name: "create/webserver"
+      vars:
+        component_ns: "{{ organization.name | lower }}-ns"
+        gitops: "{{ organization.gitops }}"
+        vault: "{{ organization.vault }}"
+        kubernetes: "{{ organization.k8s }}"
+        services: "{{ organization.services }}"
+        values_dir: "{{ playbook_dir }}/../../../{{ organization.gitops.release_dir }}/{{ organization.name | lower }}"
+      loop: "{{ network['organizations'] }}"
+      loop_control:
+        loop_var: organization
+      when: network['type'] == 'indy'
+    
+    # Deploy the Indy Clients for Endorser orgs
+    - name: "Create value files to deploy Aries endorser endpoints"
+      include_role:
+        name: "create/endorser"
+      vars:
+        component_ns: "{{ organization.name | lower }}-ns"
+        gitops: "{{ organization.gitops }}"
+        vault: "{{ organization.vault }}"
+        kubernetes: "{{ organization.k8s }}"
+        services: "{{ organization.services }}"
+        values_dir: "{{ playbook_dir }}/../../../{{ organization.gitops.release_dir }}/{{ organization.name | lower }}"
+      loop: "{{ network['organizations'] }}"
+      loop_control:
+        loop_var: organization
+      when: network['type'] == 'indy'
+    vars: #These variables can be overriden from the command line
+      install_os: "linux"           # Default to linux OS
+      install_arch:  "amd64"        # Default to amd64 architecture
+      bin_install_dir:  "~/bin"     # Default to /bin install directory for binaries
